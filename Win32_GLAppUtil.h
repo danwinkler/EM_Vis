@@ -554,6 +554,8 @@ struct Model
     ShaderFill    * Fill;
     VertexBuffer  * vertexBuffer;
     IndexBuffer   * indexBuffer;
+	int             IsVisible;
+	int             IsArrow;
 
     Model(Vector3f pos, ShaderFill * fill) :
         numVertices(0),
@@ -564,7 +566,9 @@ struct Model
         Fill(fill),
         vertexBuffer(nullptr),
         indexBuffer(nullptr),
-		Scale(1.f)
+		Scale(1.f),
+		IsVisible(0),
+		IsArrow(0)
     {}
 
     ~Model()
@@ -1068,17 +1072,71 @@ struct Scene
 {
     int     numModels;
     Model * Models[5000];
+	const int maxArrows = 100;
 
-    void    Add(Model * n)
+    void Add(Model * n)
     {
 		assert(numModels < sizeof(Models) / sizeof(Models[0]) );
         Models[numModels++] = n;
     }
 
+	float randf() {
+		return (float)(rand() % 1000) / 1000.f - 0.5f;
+	}
+
     void Render(Matrix4f view, Matrix4f proj)
     {
-        for (int i = 0; i < numModels; ++i)
-            Models[i]->Render(view, proj);
+		Vector3f cen( 0, 0, 0 );
+		const int numChg = 2;
+		Vector3f chgPos[numChg];
+		chgPos[0] = cen - Vector3f(-2.f, 0, 0);
+		chgPos[1] = cen - Vector3f(+2.f, 0, 0);
+		float chg[2] = { -1.f, +1.f };
+		Vector3f z(0.f, 0.f, 1.f);
+
+		for (int i = 0; i < numModels; ++i) {
+			if (Models[i]->IsArrow) {
+				if (Models[i]->IsVisible) {
+					// INTEGRATE along f
+					Vector3f xyz = Models[i]->Pos;
+					Vector3f f;//(0.f, 1.f, 0.f);
+					
+					for (int j = 0; j < numChg; j++) {
+						Vector3f r = xyz - chgPos[j];
+						float mag = chg[j] / r.LengthSq();
+						r.Normalize();
+						f += r * mag;
+					}
+
+					Models[i]->Pos += f * 0.01f;
+					Models[i]->Scale = f.Length();
+					f.Normalize();
+					Models[i]->Rot = Quatf::Align(f, z);
+					Models[i]->Render(view, proj);
+
+					Vector3f rToChg0 = xyz - chgPos[0];
+					if (rToChg0.Length() < 1.f) {
+						Models[i]->IsVisible = 0;
+					}
+
+					if (xyz.Length() > 6.f) {
+						Models[i]->IsVisible = 0;
+					}
+				}
+				else {
+					if (rand() % 1 == 0) {
+						Models[i]->IsVisible = 1;
+						Models[i]->Pos = Vector3f(randf(), randf(), randf());
+						Models[i]->Pos.Normalize();
+						Models[i]->Pos *= 0.1f;
+						Models[i]->Pos += chgPos[1];
+					}
+				}
+			}
+			else {
+				Models[i]->Render(view, proj);
+			}
+		}
     }
 
     GLuint CreateShader(GLenum type, const GLchar* src)
@@ -1170,48 +1228,13 @@ struct Scene
 
 		Model *m;
 
-		const int xDim = 10;
-		const int yDim = 5;
-		const int zDim = 10;
-
-
-		Vector3f cen((float)xDim / 2.f, (float)yDim / 2.f, (float)zDim / 2.f);
-		const int numChg = 2;
-		Vector3f chgPos[numChg];
-		chgPos[0] = cen - Vector3f(-2.f, 0, 0);
-		chgPos[1] = cen - Vector3f(+2.f, 0, 0);
-		float chg[2] = { -1.f, +1.f };
-
-		for (int z = 0; z < zDim; z++) {
-			for (int y = 0; y < yDim; y++) {
-				for (int x = 0; x < xDim; x++) {
-
-					Vector3f xyz((float)x, (float)y, (float)z);
-					Vector3f f;
-					for (int i = 0; i < numChg; i++) {
-						Vector3f r = xyz - chgPos[i];
-						float mag = chg[i] / r.LengthSq();
-						r.Normalize();
-						f += r * mag;
-					}
-
-					float fMag = f.Length();
-					fMag = fMag > 1.f ? 1.f : fMag;
-					f.Normalize();
-
-					m = new Model(Vector3f(0, 0, 0), grid_material[4]);
-					float scale = 0.15f;
-					m->AddArrow();
-					m->AllocateBuffers();
-					m->Pos = Vector3f( (float)x - (float)xDim / 2.f, (float)y, (float)z );
-
-					Vector3f z(0.f, 0.f, 1.f);
-					m->Rot = Quatf::Align(f, z);
-					m->Scale = fMag;
-
-					Add(m);
-				}
-			}
+		for (int i = 0; i < maxArrows; i++ ) {
+			m = new Model(Vector3f(0, 0, 0), grid_material[4]);
+			m->AddArrow();
+			m->AllocateBuffers();
+			m->IsVisible = 0;
+			m->IsArrow = 1;
+			Add(m);
 		}
 
 		float x1 = -10.f;
