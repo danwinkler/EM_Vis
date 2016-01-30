@@ -547,6 +547,7 @@ struct Model
     Vector3f        Pos;
     Quatf           Rot;
     Matrix4f        Mat;
+	float           Scale;
     int             numVertices, numIndices;
     Vertex          Vertices[2000]; // Note fixed maximum
     GLushort        Indices[2000];
@@ -562,7 +563,8 @@ struct Model
         Mat(),
         Fill(fill),
         vertexBuffer(nullptr),
-        indexBuffer(nullptr)
+        indexBuffer(nullptr),
+		Scale(1.f)
     {}
 
     ~Model()
@@ -573,8 +575,9 @@ struct Model
     Matrix4f& GetMatrix()
     {
         Mat = Matrix4f(Rot);
-        Mat = Matrix4f::Translation(Pos) * Mat;
-        return Mat;
+		Mat = Matrix4f::Scaling(Scale) * Mat;
+		Mat = Matrix4f::Translation(Pos) * Mat;
+		return Mat;
     }
 
 	void AddVertex(const Vertex& v) { Vertices[numVertices++] = v; assert(numVertices < sizeof(Vertices) / sizeof(Vertices[0])); }
@@ -1064,10 +1067,11 @@ struct Model
 struct Scene
 {
     int     numModels;
-    Model * Models[1000];
+    Model * Models[5000];
 
     void    Add(Model * n)
     {
+		assert(numModels < sizeof(Models) / sizeof(Models[0]) );
         Models[numModels++] = n;
     }
 
@@ -1166,33 +1170,72 @@ struct Scene
 
 		Model *m;
 
-		for (int y = 0; y < 5; y++ ) {
-			for (int x = 0; x < 20; x++ ) {
-				m = new Model(Vector3f(0, 0, 0), grid_material[4]);
-				float scale = 0.15f;
-				//m->AddColorPyramid(-scale, -scale, 0, scale, scale, 7.0f*scale, 0xFF404080);
-				m->AddArrow();
-				m->AllocateBuffers();
-				m->Pos = Vector3f((float)x-10.f, (float)y, 0.f);
-				Add(m);
+		const int xDim = 10;
+		const int yDim = 5;
+		const int zDim = 10;
+
+
+		Vector3f cen((float)xDim / 2.f, (float)yDim / 2.f, (float)zDim / 2.f);
+		const int numChg = 2;
+		Vector3f chgPos[numChg];
+		chgPos[0] = cen - Vector3f(-2.f, 0, 0);
+		chgPos[1] = cen - Vector3f(+2.f, 0, 0);
+		float chg[2] = { -1.f, +1.f };
+
+		for (int z = 0; z < zDim; z++) {
+			for (int y = 0; y < yDim; y++) {
+				for (int x = 0; x < xDim; x++) {
+
+					Vector3f xyz((float)x, (float)y, (float)z);
+					Vector3f f;
+					for (int i = 0; i < numChg; i++) {
+						Vector3f r = xyz - chgPos[i];
+						float mag = chg[i] / r.LengthSq();
+						r.Normalize();
+						f += r * mag;
+					}
+
+					float fMag = f.Length();
+					fMag = fMag > 1.f ? 1.f : fMag;
+					f.Normalize();
+
+					m = new Model(Vector3f(0, 0, 0), grid_material[4]);
+					float scale = 0.15f;
+					m->AddArrow();
+					m->AllocateBuffers();
+					m->Pos = Vector3f( (float)x - (float)xDim / 2.f, (float)y, (float)z );
+
+					Vector3f z(0.f, 0.f, 1.f);
+					m->Rot = Quatf::Align(f, z);
+					m->Scale = fMag;
+
+					Add(m);
+				}
 			}
 		}
 
+		float x1 = -10.f;
+		float x2 = +10.f;
+		float y1 = -10.f;
+		float y2 = +10.f;
+		float z1 = -10.f;
+		float z2 = +10.f;
+
 		m = new Model(Vector3f(0, 0, 0), grid_material[1]);  // Walls
-        m->AddSolidColorBox(-10.1f, 0.0f, -20.0f, -10.0f, 4.0f, 20.0f, 0xff808080); // Left Wall
-        m->AddSolidColorBox(-10.0f, -0.1f, -20.1f, 10.0f, 4.0f, -20.0f, 0xff808080); // Back Wall
-		m->AddSolidColorBox(10.0f, -0.1f, -20.0f, 10.1f, 4.0f, 20.0f, 0xff808080); // Right Wall
-		m->AddSolidColorBox(-10.0f, -0.1f, 20.1f, 10.0f, 4.0f, 20.0f, 0xff808080); // Front Wall
+        m->AddSolidColorBox(x1, y1, z1, x1-0.1f, y2, z2, 0xff808080); // Right Wall
+		m->AddSolidColorBox(x2, y1, z1, x2+0.1f, y2, z2, 0xff808080); // Left Wall
+		m->AddSolidColorBox(x1, y1, z1, x2, y2, z1-0.1f, 0xff808080); // Front Wall
+		m->AddSolidColorBox(x1, y1, z2, x2, y2, z2+0.1f, 0xff808080); // Back Wall
 		m->AllocateBuffers();
         Add(m);
 
         m = new Model(Vector3f(0, 0, 0), grid_material[0]);  // Floors
-        m->AddSolidColorBox(-10.0f, -0.1f, -20.0f, 10.0f, 0.0f, 20.1f, 0xff808080); // Main floor
+        m->AddSolidColorBox(x1, y1, z1, x2, y1-0.1f, z2, 0xff808080); // Main floor
         m->AllocateBuffers();
         Add(m);
 
         m = new Model(Vector3f(0, 0, 0), grid_material[2]);  // Ceiling
-        m->AddSolidColorBox(-10.0f, 4.0f, -20.0f, 10.0f, 4.1f, 20.1f, 0xff808080);
+        m->AddSolidColorBox(x1, y2, z1, x2, y2+0.1f, z2, 0xff808080);
         m->AllocateBuffers();
         Add(m);
     }

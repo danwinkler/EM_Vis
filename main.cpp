@@ -125,16 +125,22 @@ static bool MainLoop(bool retryCreate)
         //roomScene->Models[0]->Pos = Vector3f(9 * sin(cubeClock), 3, 9 * cos(cubeClock));
 
 		// ZJD hack to spin our pyramid
-		
-		for (int y = 0; y < 5; y++) {
-			for (int x = 0; x < 20; x++) {
-				Vector3f rotAxis(x*0.5f, y*1.f, 0.f);
-				rotAxis *= cubeClock;
-				Quatf spin = Quatf::FromRotationVector(rotAxis);
-				roomScene->Models[y * 20 + x]->Rot = spin;
+		/*
+		const int xDim = 20;
+		const int yDim = 10;
+		const int zDim = 20;
+
+		for (int z = 0; z < zDim; z++) {
+			for (int y = 0; y < yDim; y++) {
+				for (int x = 0; x < xDim; x++) {
+					Vector3f rotAxis(x*0.5f, y*1.f, 0.f);
+					rotAxis *= cubeClock;
+					Quatf spin = Quatf::FromRotationVector(rotAxis);
+					//roomScene->Models[y * 20 + x]->Rot = spin;
+				}
 			}
 		}
-
+		*/
         // Get eye poses, feeding in correct IPD offset
         ovrVector3f               ViewOffset[2] = { EyeRenderDesc[0].HmdToEyeViewOffset,
                                                     EyeRenderDesc[1].HmdToEyeViewOffset };
